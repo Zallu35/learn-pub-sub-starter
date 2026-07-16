@@ -2,9 +2,8 @@ package main
 
 import (
 	"fmt"
-	"os"
-	"os/signal"
 
+	"github.com/Zallu35/learn-pub-sub-starter/internal/gamelogic"
 	"github.com/Zallu35/learn-pub-sub-starter/internal/pubsub"
 	"github.com/Zallu35/learn-pub-sub-starter/internal/routing"
 
@@ -32,8 +31,42 @@ func main() {
 		fmt.Printf("Error publishing JSON to channel: %v", err)
 	}
 
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, os.Interrupt)
-	<-sigChan
-	fmt.Printf("Closing server")
+	secondChannel, transQueue, err := pubsub.DeclareAndBind(rmqConnection, routing.ExchangePerilTopic, routing.GameLogSlug, routing.GameLogSlug+".*", pubsub.Durable)
+	if secondChannel != nil {
+		fmt.Println("Channel Good")
+	}
+	if transQueue.Name != "" {
+		fmt.Println("Queue Good")
+	}
+
+	gamelogic.PrintServerHelp()
+
+MainLoop:
+	for {
+		userInput := gamelogic.GetInput()
+		if len(userInput) == 0 {
+			continue
+		}
+		switch userInput[0] {
+		case "pause":
+			fmt.Println("Sending pause")
+			err = pubsub.PublishJSON(myNewChannel, routing.ExchangePerilDirect, routing.PauseKey, routing.PlayingState{IsPaused: true})
+		case "resume":
+			fmt.Println("Sending resume")
+			err = pubsub.PublishJSON(myNewChannel, routing.ExchangePerilDirect, routing.PauseKey, routing.PlayingState{IsPaused: false})
+		case "help":
+			gamelogic.PrintServerHelp()
+		case "quit":
+			fmt.Println("Exiting")
+			break MainLoop
+		default:
+			fmt.Println("Unknown command, type 'help' for a list of commands")
+		}
+	}
+	/*
+	   sigChan := make(chan os.Signal, 1)
+	   signal.Notify(sigChan, os.Interrupt)
+	   <-sigChan
+	   fmt.Printf("Closing server")
+	*/
 }
